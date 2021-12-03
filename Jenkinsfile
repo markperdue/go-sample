@@ -22,9 +22,11 @@ spec:
     }
     stages {
         stage('checkout') {
-            sh 'ls -la'
-            checkout scm
-            sh 'ls -la'
+            steps {
+                sh 'ls -la'
+                checkout scm
+                sh 'ls -la'
+            }
         }
         stage('build') {
             environment {
