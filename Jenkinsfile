@@ -39,6 +39,11 @@ spec:
         version = '0.1.1'
     }
     stages {
+        stage('checkout') {
+            steps {
+                git changelog: false, poll: false, url: 'https://github.com/markperdue/go-sample.git'
+            }
+        }
         stage('build') {
             environment {
                 PATH = "/busybox:/kaniko:$PATH"
