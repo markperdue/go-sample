@@ -1,4 +1,7 @@
 pipeline {
+    parameters {
+        string(name: 'image', description: 'desired image name', defaultValue: 'mperdue/go-sample')
+    }
     agent {
         kubernetes {
             cloud 'cicd'
@@ -50,14 +53,14 @@ spec:
             }
             steps {
                 container(name: 'kaniko', shell: '/busybox/sh') {
-                    sh "/kaniko/executor --dockerfile `pwd`/Dockerfile --destination=mperdue/go-sample:${version} --context `pwd` --build-arg 'version=${version}'"
+                    sh "/kaniko/executor --dockerfile `pwd`/Dockerfile --destination=${params.image}:${version} --context `pwd` --build-arg 'version=${version}'"
                 }
             }
         }
         stage('deploy') {
             steps {
                 container(name: 'helm') {
-                    sh "helm upgrade --install go-sample ./go-sample --set 'image.tag=${version}' -n cicd --wait"
+                    sh "helm upgrade --install go-sample ./go-sample --set 'image.repository=${params.image}' --set 'image.tag=${version}' -n cicd --wait"
                 }
             }
         }
