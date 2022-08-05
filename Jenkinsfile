@@ -34,7 +34,7 @@ spec:
   volumes:
     - name: config-volume
       configMap:
-        name: kaniko-dockerhub
+        name: kaniko
 """
         }
     }
