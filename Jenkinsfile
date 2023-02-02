@@ -53,7 +53,7 @@ pipeline {
       steps {
         container(name: 'buildah') {
           withCredentials([usernameColonPassword(credentialsId: credential, variable: 'creds')]) {
-            sh 'buildah push --creds ' + creds + "${params.image}:${version} docker://${params.image}:${version}"
+            sh 'buildah push --creds ' + creds + " ${params.image}:${version} docker://${params.image}:${version}"
           }
         }
       }
