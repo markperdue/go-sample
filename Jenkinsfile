@@ -1,10 +1,10 @@
 pipeline {
   parameters {
-    string(name: 'image', description: 'desired image name', defaultValue: 'mperdue/go-sample')
+    string(name: 'image', description: 'name of the container image to build (including the container registry prefix)', defaultValue: 'docker.io/mperdue/go-sample')
     booleanParam(name: 'build', description: 'enable to build the sample app as a container image', defaultValue: false)
-    booleanParam(name: 'publish', description: 'enable to publish the sample container image to a container registry', defaultValue: false)
-    credentials(name: 'publish_cred', description: 'if publish stage is enabled, select a credential to be used for authorizing to docker.io container registry', defaultValue: '', credentialType: "Username with password", required: false )
-    booleanParam(name: 'deploy', description: 'enable to deploy the sample container image using the sample helm chart', defaultValue: false)
+    booleanParam(name: 'publish', description: 'enable to publish the sample container image to a container registry\n(requires build stage to be enabled)', defaultValue: false)
+    booleanParam(name: 'deploy', description: 'enable to deploy the sample container image using the sample helm chart\n(requires both build and publish stages to be enabled)', defaultValue: false)
+    credentials(name: 'credential', description: 'if publish stage is enabled, select a credential to be used for authorizing to the container registry', defaultValue: '', credentialType: "Username with password", required: false )
   }
   agent {
     kubernetes {
@@ -52,8 +52,8 @@ pipeline {
       when { expression { return params.publish.toBoolean() } }
       steps {
         container(name: 'buildah') {
-          withCredentials([usernameColonPassword(credentialsId: publish_cred, variable: 'creds')]) {
-            sh 'buildah push --creds ' + creds + "${params.image}:${version} docker://docker.io/${params.image}:${version}"
+          withCredentials([usernameColonPassword(credentialsId: credential, variable: 'creds')]) {
+            sh 'buildah push --creds ' + creds + "${params.image}:${version} docker://${params.image}:${version}"
           }
         }
       }
