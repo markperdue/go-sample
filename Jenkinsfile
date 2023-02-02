@@ -1,68 +1,70 @@
 pipeline {
-    parameters {
-        string(name: 'image', description: 'desired image name', defaultValue: 'mperdue/go-sample')
+  parameters {
+    string(name: 'image', description: 'desired image name', defaultValue: 'mperdue/go-sample')
+    booleanParam(name: 'build', description: 'enable to build the sample app as a container image', defaultValue: false)
+    booleanParam(name: 'publish', description: 'enable to publish the sample container image to a container registry', defaultValue: false)
+    credentials(name: 'publish_cred', description: 'if publish stage is enabled, select a credential to be used for authorizing to docker.io container registry', defaultValue: '', credentialType: "Username with password", required: false )
+    booleanParam(name: 'deploy', description: 'enable to deploy the sample container image using the sample helm chart', defaultValue: false)
+  }
+  agent {
+    kubernetes {
+      cloud 'cicd'
+      serviceAccount 'jenkins'
+      yaml '''
+        kind: Pod
+        spec:
+          securityContext:
+            runAsUser: 1000
+          containers:
+            - name: buildah
+              image: quay.io/buildah/stable
+              imagePullPolicy: IfNotPresent
+              command: ["cat"]
+              tty: true
+              securityContext:
+                privileged: true
+            - name: helm
+              image: docker.io/alpine/helm:3.10.2
+              imagePullPolicy: IfNotPresent
+              command: ["cat"]
+              tty: true
+        '''
     }
-    agent {
-        kubernetes {
-            cloud 'cicd'
-            serviceAccount 'jenkins'
-            yaml """
-kind: Pod
-metadata:
-  name: kaniko
-spec:
-  containers:
-    - name: jnlp
-      workingDir: /home/jenkins/agent
-    - name: kaniko
-      workingDir: /home/jenkins/agent
-      image: gcr.io/kaniko-project/executor:debug
-      imagePullPolicy: Always
-      command:
-        - /busybox/cat
-      tty: true
-      volumeMounts:
-        - name: config-volume
-          mountPath: /kaniko/.docker/
-    - name: helm
-      workingDir: /home/jenkins/agent
-      image: alpine/helm:3.7.1
-      imagePullPolicy: Always
-      command:
-        - cat
-      tty: true
-  volumes:
-    - name: config-volume
-      configMap:
-        name: kaniko
-"""
-        }
+  }
+  environment {
+    version = '0.1.1'
+  }
+  stages {
+    stage('checkout') {
+      steps {
+        git url: 'https://github.com/markperdue/go-sample.git'
+      }
     }
-    environment {
-        version = '0.1.1'
+    stage('build') {
+      when { expression { return params.build.toBoolean() } }
+      steps {
+        container(name: 'buildah') {
+          sh "buildah bud -f Dockerfile -t ${params.image}:${version} --build-arg 'version=${version}' ."
+        }
+      }
     }
-    stages {
-        stage('checkout') {
-            steps {
-                git changelog: false, poll: false, url: 'https://github.com/markperdue/go-sample.git'
-            }
+    stage('publish') {
+      when { expression { return params.publish.toBoolean() } }
+      steps {
+        container(name: 'buildah') {
+          withCredentials([usernameColonPassword(credentialsId: publish_cred, variable: 'creds')]) {
+            sh 'buildah push --creds ' + creds + "${params.image}:${version} docker://docker.io/${params.image}:${version}"
+          }
         }
-        stage('build') {
-            environment {
-                PATH = "/busybox:/kaniko:$PATH"
-            }
-            steps {
-                container(name: 'kaniko', shell: '/busybox/sh') {
-                    sh "/kaniko/executor --dockerfile `pwd`/Dockerfile --destination=${params.image}:${version} --context `pwd` --build-arg 'version=${version}'"
-                }
-            }
-        }
-        stage('deploy') {
-            steps {
-                container(name: 'helm') {
-                    sh "helm upgrade --install go-sample ./go-sample --set 'image.repository=${params.image}' --set 'image.tag=${version}' -n cicd --wait"
-                }
-            }
-        }
+      }
     }
+    stage('deploy') {
+      when { expression { return params.deploy.toBoolean() } }
+      steps {
+        container(name: 'helm') {
+          sh "helm upgrade --install go-sample ./helm --set 'image.repository=${params.image}' --set 'image.tag=${version}' -n cicd --wait"
+        }
+      }
+    }
+  }
 }
