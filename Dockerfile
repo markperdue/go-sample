@@ -1,4 +1,4 @@
-FROM golang:1.17.3-alpine AS build
+FROM docker.io/golang:1.20.0-alpine AS build
 ARG version=999
 WORKDIR /go/src/app
 ADD go.mod /go/src/app
