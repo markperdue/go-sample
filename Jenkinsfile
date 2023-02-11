@@ -35,6 +35,7 @@ pipeline {
     skipDefaultCheckout true
   }
   environment {
+    //  example value only. generally set to something determined from code/source control
     version = '0.1.1'
   }
   stages {
