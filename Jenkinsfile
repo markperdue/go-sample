@@ -28,6 +28,11 @@ pipeline {
               imagePullPolicy: IfNotPresent
               command: ["cat"]
               tty: true
+            - name: kubectl
+              image: docker.io/bitnami/kubectl
+              imagePullPolicy: IfNotPresent
+              command: ["cat"]
+              tty: true
         '''
     }
   }
@@ -67,6 +72,20 @@ pipeline {
       steps {
         container(name: 'helm') {
           sh "helm upgrade --install go-sample ./helm --set 'image.repository=${params.image}' --set 'image.tag=${version}' -n cicd --wait"
+        }
+      }
+    }
+    stage('validate') {
+      when { expression { return params.deploy.toBoolean() } }
+      steps {
+        container(name: 'kubectl') {
+          script {
+            String url = sh returnStdout: true, script: "kubectl get svc --namespace cicd go-sample --template '{{ range (index .status.loadBalancer.ingress 0) }}{{.}}{{ end }}'"
+            echo "Discovered the go app running on ${url}. Making a curl call to the service's external ip"
+            container(name: 'jnlp') {
+              sh "curl --silent http://${url}"
+            }
+          }
         }
       }
     }
